@@ -15,7 +15,7 @@
       <a href="/settings.html" class="active">Settings</a>
     </nav>
     <div class="user">
-      <select id="org-switch" class="org-switch" aria-label="Workspace" hidden></select>
+      <select id="org-switch" class="org-switch select-sm" aria-label="Workspace" hidden></select>
       <span id="user-name" class="muted"></span>
       <button id="logout-btn" class="btn btn-ghost btn-sm" type="button">Log out</button>
     </div>
@@ -50,13 +50,13 @@
       <h2>Members</h2>
       <div id="members"></div>
       <form id="member-form" class="form-row" novalidate>
-        <label class="grow">Add by email <input name="email" type="email" placeholder="colleague@company.com" required>
-          <span class="hint">They need an account first (they register, then you add them).</span></label>
+        <label class="grow">Add by email <input name="email" type="email" placeholder="colleague@company.com" required></label>
         <label>Role
           <select name="role"><option value="developer">Developer</option><option value="viewer">Viewer</option>
             <option value="admin">Admin</option><option value="owner">Owner</option></select></label>
         <button class="btn btn-ghost" type="submit">Add</button>
       </form>
+      <p class="hint muted member-hint">They need an account first: they register, then you add them.</p>
       <p class="form-error" id="member-error" hidden></p>
       <details class="small muted roles-help"><summary>What can each role do?</summary>
         <ul>
@@ -72,7 +72,7 @@
       <div class="card-head">
         <h2>Activity log</h2>
         <label class="inline small">Show
-          <select id="log-filter">
+          <select id="log-filter" class="select-sm">
             <option value="">Everything</option><option value="user.*">Sign-ins &amp; accounts</option>
             <option value="member.*">Members</option><option value="repository.*">Repositories</option>
             <option value="audit.*">Audits</option><option value="finding.*">Findings</option>

@@ -3,6 +3,7 @@
   --surface: #171b21;
   --surface-2: #1f252d;
   --border: #2a313b;
+  --border-hover: #3a4350;
   --text: #e6e9ee;
   --muted: #8b95a3;
   --primary: #4f8cff;
@@ -94,10 +95,29 @@ body.booting main { visibility: hidden; }
 
 label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--muted); margin-bottom: 14px; }
 input, select {
-  font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--border);
-  border-radius: 8px; padding: 9px 12px; min-width: 0;
+  font: inherit; color: var(--text); background-color: var(--bg); border: 1px solid var(--border);
+  border-radius: 8px; padding: 0 12px; height: 38px; min-width: 0; line-height: normal;
 }
+input:hover, select:hover { border-color: var(--border-hover); }
 input:focus, select:focus { outline: 2px solid var(--primary); outline-offset: -1px; border-color: transparent; }
+input:disabled, select:disabled { color: var(--muted); border-color: var(--border); cursor: default; }
+
+/* Dropdowns: one custom look everywhere (the native arrow sat against the border and varied by OS) */
+select {
+  appearance: none; -webkit-appearance: none; cursor: pointer;
+  padding-right: 34px; text-overflow: ellipsis; white-space: nowrap;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%238b95a3' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 12px center; background-size: 12px;
+}
+select:disabled { background-image: none; padding-right: 12px; }  /* nothing to choose: no arrow */
+select option { background: var(--surface); color: var(--text); }
+select.select-sm, .table select { height: 32px; font-size: 13px; padding-left: 10px; padding-right: 30px; background-position: right 10px center; }
+/* A compact dropdown with nothing to choose reads as plain text (single workspace, your own role) */
+select.select-sm:disabled, .table select:disabled {
+  padding-right: 10px; border-color: transparent; background-color: transparent; color: var(--muted); cursor: default;
+}
+#members .table td { vertical-align: middle; }  /* rows hold controls */
+.member-hint { margin: 8px 0 0; }
 .hint { font-size: 12px; }
 .form-row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
 .form-row label { margin-bottom: 0; }
@@ -106,7 +126,8 @@ input:focus, select:focus { outline: 2px solid var(--primary); outline-offset: -
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
 .form-grid .span-2 { grid-column: span 2; }
 @media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } .form-grid .span-2 { grid-column: auto; } }
-input[type=file] { padding: 7px; }
+input[type=file] { padding: 7px; height: auto; }
+input[type=checkbox], input[type=radio] { height: auto; padding: 0; width: 16px; height: 16px; accent-color: var(--primary); }
 
 .tabs { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid var(--border); }
 .tab { font: inherit; font-weight: 600; color: var(--muted); background: none; border: 0; border-bottom: 2px solid transparent;
@@ -289,8 +310,8 @@ h2.spaced { margin-top: 18px; }
 .table-view summary { cursor: pointer; color: var(--muted); }
 
 /* Workspace switcher & settings */
-.org-switch { max-width: 220px; padding: 5px 10px; font-size: 13px; }
-.org-switch:disabled { opacity: 1; color: var(--muted); }
+.org-switch { max-width: 220px; }
+.org-switch:disabled { opacity: 1; color: var(--muted); background-color: transparent; }
 .roles-help { margin-top: 12px; }
 .roles-help ul { margin: 6px 0 0; padding-left: 18px; }
 #logs .table { min-width: 560px; }  /* scroll sideways on phones instead of crushing Details */

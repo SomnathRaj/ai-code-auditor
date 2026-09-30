@@ -2,7 +2,8 @@
 
 - Fixed argument lists (no shell); `--` before URLs; branch names pre-validated.
 - Isolated config: no system/global config or credential helpers (e.g. macOS
-  keychain), HOME points at an empty directory, prompts disabled.
+  keychain), HOME points at an empty directory, prompts disabled. Commands run
+  in that empty directory, never the app's own (possibly git) working directory.
 - Only allowed protocols (https in production).
 - Access tokens go in an http.extraHeader set through GIT_CONFIG_* environment
   variables, scoped to https://github.com/ — never in argv, URLs or logs.
@@ -70,6 +71,8 @@ def _env(home: str, token: str | None) -> dict:
         "GIT_ASKPASS": "/bin/echo",
         "SSH_ASKPASS": "/bin/echo",
         "GIT_CONFIG_NOSYSTEM": "1",
+        # Never discover a repository above the temp dir (e.g. the app's own checkout and its .git/config).
+        "GIT_CEILING_DIRECTORIES": os.path.dirname(home),
         "GIT_CONFIG_GLOBAL": os.devnull,
         "GIT_ALLOW_PROTOCOL": ":".join(current_app.config["GIT_ALLOWED_PROTOCOLS"]),
         "GIT_LFS_SKIP_SMUDGE": "1",
@@ -107,7 +110,7 @@ def run(args: list[str], *, timeout: float, token: str | None = None, cwd: str |
     home = tempfile.mkdtemp(prefix="git-home-")
     try:
         proc = subprocess.Popen(
-            args, cwd=cwd, env=_env(home, token), stdin=subprocess.DEVNULL,
+            args, cwd=cwd or home, env=_env(home, token),  # never the app's working directory stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True,
         )
         deadline = time.monotonic() + timeout
