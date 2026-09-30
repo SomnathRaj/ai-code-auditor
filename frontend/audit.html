@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Audit · AI Code Auditor</title>
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body class="booting" data-page="app">
+  <header class="topbar">
+    <a class="brand" href="/"><span class="brand-mark">◆</span> <span class="brand-text">AI Code Auditor</span></a>
+    <nav class="nav">
+      <a href="/" >Dashboard</a>
+      <a href="/repositories.html" class="active">Repositories</a>
+      <a href="/settings.html">Settings</a>
+    </nav>
+    <div class="user">
+      <select id="org-switch" class="org-switch" aria-label="Workspace" hidden></select>
+      <span id="user-name" class="muted"></span>
+      <button id="logout-btn" class="btn btn-ghost btn-sm" type="button">Log out</button>
+    </div>
+  </header>
+  <main class="container">
+    <div id="audit" hidden>
+      <div class="page-head">
+        <div>
+          <a class="muted small" id="back-link" href="/repositories.html">← Repository</a>
+          <h1 id="audit-title">Audit</h1>
+          <p class="muted" id="audit-meta"></p>
+        </div>
+        <div class="actions">
+          <button class="btn btn-danger" id="cancel-btn" type="button" hidden>Cancel audit</button>
+          <a class="btn btn-primary" id="findings-link" href="#" hidden>View findings</a>
+          <a class="btn btn-ghost" id="rerun-link" href="#" hidden>Run again</a>
+          <button class="btn btn-danger" id="delete-btn" type="button" hidden>Delete audit</button>
+        </div>
+      </div>
+
+      <section class="card">
+        <div class="card-head">
+          <h2>Progress</h2>
+          <span class="badge" id="status-badge"></span>
+        </div>
+        <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" id="progress">
+          <div class="progress-fill" id="progress-fill"></div>
+        </div>
+        <ol class="stages" id="stages"></ol>
+        <p class="form-error" id="audit-error" hidden></p>
+      </section>
+
+      <div id="results" hidden>
+        <section class="grid grid-sev" id="severity-cards"></section>
+        <section class="grid grid-2">
+          <div class="card">
+            <h2>Security score</h2>
+            <div class="score" id="score">–</div>
+            <p class="muted small" id="score-note"></p>
+          </div>
+          <div class="card">
+            <h2>Summary</h2>
+            <dl class="details" id="summary"></dl>
+          </div>
+        </section>
+        <section class="card">
+          <div class="card-head"><h2>Reports</h2><a class="small" id="compare-link" href="#" hidden>Compare with previous audit →</a></div>
+          <div class="report-grid">
+            <div>
+              <h3 class="report-kind">Technical</h3>
+              <p class="muted small">Every finding with code, evidence, CWE/OWASP, fixes and AI analysis.</p>
+              <div class="actions wrap">
+                <button class="btn btn-ghost btn-sm" type="button" data-report="technical" data-format="pdf">PDF</button>
+                <button class="btn btn-ghost btn-sm" type="button" data-report="technical" data-format="html">HTML</button>
+                <button class="btn btn-ghost btn-sm" type="button" data-report="technical" data-format="csv">CSV</button>
+                <button class="btn btn-ghost btn-sm" type="button" data-report="technical" data-format="json">JSON</button>
+              </div>
+            </div>
+            <div>
+              <h3 class="report-kind">Executive</h3>
+              <p class="muted small">Risk summary, top risks, recommendations and trend for technical leads.</p>
+              <div class="actions wrap">
+                <button class="btn btn-ghost btn-sm" type="button" data-report="executive" data-format="pdf">PDF</button>
+                <button class="btn btn-ghost btn-sm" type="button" data-report="executive" data-format="html">HTML</button>
+                <button class="btn btn-ghost btn-sm" type="button" data-report="executive" data-format="json">JSON</button>
+              </div>
+            </div>
+          </div>
+          <p class="form-error" id="report-error" hidden></p>
+        </section>
+        <section class="card" id="warnings-card" hidden>
+          <h2>Warnings</h2>
+          <ul class="warnings" id="warnings"></ul>
+        </section>
+      </div>
+    </div>
+    <p class="muted" id="loading">Loading…</p>
+  </main>
+  <script src="/js/api.js"></script>
+  <script src="/js/audit.js"></script>
+</body>
+</html>

@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Repository · AI Code Auditor</title>
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body class="booting" data-page="app">
+  <header class="topbar">
+    <a class="brand" href="/"><span class="brand-mark">◆</span> <span class="brand-text">AI Code Auditor</span></a>
+    <nav class="nav">
+      <a href="/" >Dashboard</a>
+      <a href="/repositories.html" class="active">Repositories</a>
+      <a href="/settings.html">Settings</a>
+    </nav>
+    <div class="user">
+      <select id="org-switch" class="org-switch" aria-label="Workspace" hidden></select>
+      <span id="user-name" class="muted"></span>
+      <button id="logout-btn" class="btn btn-ghost btn-sm" type="button">Log out</button>
+    </div>
+  </header>
+  <main class="container">
+    <div class="page-head">
+      <div>
+        <a class="muted small" href="/repositories.html">← Repositories</a>
+        <h1 id="repo-name">Loading…</h1>
+        <p class="muted" id="repo-meta"></p>
+      </div>
+      <div class="actions">
+        <button class="btn btn-primary" id="start-toggle" type="button" hidden>Start audit</button>
+        <button class="btn btn-danger" id="delete-btn" type="button" hidden>Delete</button>
+      </div>
+    </div>
+
+    <section class="banner" id="active-banner" hidden></section>
+
+    <section class="card" id="start-card" hidden>
+      <h2>Start an audit</h2>
+      <form id="start-form" class="form-row" novalidate>
+        <label id="start-branch-label">Branch <select name="branch" id="start-branch"></select></label>
+        <label>Type
+          <select name="audit_type">
+            <option value="full">Full — all enabled checks</option>
+            <option value="security">Security — code and secrets</option>
+            <option value="dependency">Dependencies only</option>
+            <option value="secret">Secrets only</option>
+            <option value="quick">Quick — high and critical only</option>
+          </select>
+        </label>
+        <button class="btn btn-primary" type="submit">Start</button>
+      </form>
+      <p class="form-error" id="start-error" hidden></p>
+    </section>
+
+    <section class="grid grid-sev" id="severity-cards"></section>
+
+    <section class="grid grid-2">
+      <div class="card">
+        <h2>Details</h2>
+        <dl class="details" id="repo-details"></dl>
+      </div>
+      <div class="card">
+        <h2>Audit settings</h2>
+        <dl class="details" id="repo-settings"></dl>
+        <form id="settings-form" hidden novalidate>
+          <fieldset class="checks">
+            <legend>Scanners</legend>
+            <label class="inline"><input type="checkbox" name="scanner" value="semgrep"> Code analysis (Semgrep)</label>
+            <label class="inline"><input type="checkbox" name="scanner" value="gitleaks"> Secrets (Gitleaks)</label>
+            <label class="inline"><input type="checkbox" name="scanner" value="dependencies"> Dependencies (OSV)</label>
+          </fieldset>
+          <label>Excluded paths <textarea name="excluded_paths" rows="4" spellcheck="false"></textarea>
+            <span class="hint">One per line. "name/" excludes that folder anywhere; globs like *.min.js work too.</span></label>
+          <label>Report findings of at least
+            <select name="severity_threshold">
+              <option value="info">Info</option><option value="low">Low</option><option value="medium">Medium</option>
+              <option value="high">High</option><option value="critical">Critical</option>
+            </select></label>
+          <label class="inline"><input type="checkbox" name="ai_enabled"> AI analysis of findings</label>
+          <p class="muted small" id="ai-disclosure"></p>
+          <button class="btn btn-ghost" type="submit">Save settings</button>
+          <p class="form-error" id="settings-error" hidden></p>
+          <p class="small success" id="settings-ok" hidden></p>
+        </form>
+      </div>
+    </section>
+
+    <section class="card" id="source-card" hidden>
+      <h2>Source</h2>
+      <div id="github-source" hidden>
+        <form id="branch-form" class="form-row" novalidate>
+          <label>Default branch <select name="default_branch" id="branch-select" disabled><option>Loading…</option></select></label>
+          <button class="btn btn-ghost" type="submit" id="branch-save" hidden>Save branch</button>
+        </form>
+        <p class="muted small" id="token-status"></p>
+        <form id="token-form" class="form-row" hidden novalidate>
+          <label class="grow">Access token <input name="access_token" type="password" autocomplete="off" placeholder="GitHub token with read-only Contents access"></label>
+          <button class="btn btn-ghost" type="submit">Save token</button>
+          <button class="btn btn-ghost" type="button" id="token-remove" hidden>Remove token</button>
+        </form>
+      </div>
+      <div id="zip-source" hidden>
+        <dl class="details" id="zip-details"></dl>
+        <form id="upload-form" class="form-row" hidden novalidate>
+          <label class="grow">Upload new version <input name="file" type="file" accept=".zip,application/zip"></label>
+          <button class="btn btn-ghost" type="submit">Upload</button>
+        </form>
+      </div>
+      <p class="form-error" id="source-error" hidden></p>
+      <p class="muted small" id="source-ok" hidden></p>
+    </section>
+
+    <section class="card" id="deps-card" hidden>
+      <div class="card-head">
+        <h2>Dependencies</h2>
+        <label class="inline"><input type="checkbox" id="deps-vulnerable"> Vulnerable only</label>
+      </div>
+      <p class="muted small" id="deps-meta"></p>
+      <div id="deps-list"></div>
+      <div class="pager" id="deps-pager"></div>
+    </section>
+
+    <section class="card">
+      <h2>Audit history</h2>
+      <div id="audit-history"></div>
+    </section>
+  </main>
+  <script src="/js/api.js"></script>
+  <script src="/js/repository.js"></script>
+</body>
+</html>

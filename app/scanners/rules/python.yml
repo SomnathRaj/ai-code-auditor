@@ -1,0 +1,441 @@
+# AI Code Auditor — Python rules (own ruleset; see app/scanners/rules/README.md).
+# metadata.aca_severity / aca_confidence / category drive normalization (PRD §28-30).
+rules:
+  - id: aca-python-sqli-string-built-query
+    languages: [python]
+    severity: ERROR
+    message: >-
+      SQL query is built with string formatting or concatenation and passed to a
+      database call. If any part comes from user input, this is SQL injection.
+    metadata:
+      title: SQL query built from strings
+      category: Injection
+      aca_severity: high
+      aca_confidence: medium
+      cwe: CWE-89
+      owasp: A03:2021
+      recommendation: >-
+        Use parameterized queries (e.g. cursor.execute("... WHERE id = %s", (user_id,)))
+        or the ORM's query builder instead of building SQL strings.
+    pattern-either:
+      - patterns:
+          - pattern-either:
+              - pattern: $DB.$EXEC("..." % ..., ...)
+              - pattern: $DB.$EXEC("...".format(...), ...)
+              - pattern: $DB.$EXEC(f"...", ...)
+              - pattern: $DB.$EXEC("..." + $X, ...)
+              - pattern: $DB.$EXEC($X + "...", ...)
+              - patterns:
+                  - pattern-either:
+                      - pattern-inside: |
+                          $Q = "..." % ...
+                          ...
+                      - pattern-inside: |
+                          $Q = f"..."
+                          ...
+                      - pattern-inside: |
+                          $Q = "...".format(...)
+                          ...
+                      - pattern-inside: |
+                          $Q = "..." + $X
+                          ...
+                  - pattern: $DB.$EXEC($Q, ...)
+          - metavariable-regex:
+              metavariable: $EXEC
+              regex: ^(execute|executemany|executescript|raw|mogrify)$
+      - pattern: sqlalchemy.text(f"...")
+      - pattern: sqlalchemy.text("..." % ...)
+      - pattern: sqlalchemy.text("...".format(...))
+      - pattern: sqlalchemy.text("..." + $X)
+
+  - id: aca-python-command-injection
+    languages: [python]
+    severity: ERROR
+    message: >-
+      A shell command is run with a value that is not a constant. If an attacker
+      controls it, they can run arbitrary commands on the server.
+    metadata:
+      title: Command injection risk
+      category: Injection
+      aca_severity: high
+      aca_confidence: medium
+      cwe: CWE-78
+      owasp: A03:2021
+      recommendation: >-
+        Pass arguments as a list without shell=True (subprocess.run(["cmd", arg])),
+        and validate inputs against an allowlist.
+    pattern-either:
+      - patterns:
+          - pattern: subprocess.$F(..., shell=True, ...)
+          - pattern-not: subprocess.$F("...", ..., shell=True, ...)
+      - patterns:
+          - pattern-either:
+              - pattern: os.system($X)
+              - pattern: os.popen($X, ...)
+          - pattern-not: os.system("...")
+          - pattern-not: os.popen("...", ...)
+
+  - id: aca-python-code-injection
+    languages: [python]
+    severity: ERROR
+    message: >-
+      eval()/exec() is called on a non-constant value. If the value can be
+      influenced by a user, they can execute arbitrary Python code.
+    metadata:
+      title: Dynamic code execution
+      category: Injection
+      aca_severity: high
+      aca_confidence: medium
+      cwe: CWE-95
+      owasp: A03:2021
+      recommendation: >-
+        Remove eval/exec. Use ast.literal_eval for literals, or a dispatch table
+        of allowed operations.
+    patterns:
+      - pattern-either:
+          - pattern: eval($X, ...)
+          - pattern: exec($X, ...)
+      - pattern-not: eval("...", ...)
+      - pattern-not: exec("...", ...)
+
+  - id: aca-python-unsafe-deserialization
+    languages: [python]
+    severity: ERROR
+    message: >-
+      Data is deserialized with a format that can execute code while loading.
+      Deserializing untrusted data this way allows remote code execution.
+    metadata:
+      title: Unsafe deserialization
+      category: Injection
+      aca_severity: high
+      aca_confidence: medium
+      cwe: CWE-502
+      owasp: A08:2021
+      recommendation: >-
+        Use JSON for untrusted data. For YAML use yaml.safe_load. Never unpickle
+        data that crosses a trust boundary.
+    pattern-either:
+      - pattern: pickle.loads(...)
+      - pattern: pickle.load(...)
+      - pattern: cPickle.loads(...)
+      - pattern: dill.loads(...)
+      - pattern: marshal.loads(...)
+      - pattern: shelve.open(...)
+      - patterns:
+          - pattern: yaml.load(...)
+          - pattern-not: yaml.load(..., Loader=yaml.SafeLoader, ...)
+          - pattern-not: yaml.load(..., Loader=yaml.CSafeLoader, ...)
+          - pattern-not: yaml.load(..., Loader=SafeLoader, ...)
+      - pattern: yaml.unsafe_load(...)
+
+  - id: aca-python-weak-hash
+    languages: [python]
+    severity: WARNING
+    message: >-
+      MD5/SHA-1 are broken for security purposes. If this hash protects
+      passwords, tokens or integrity, it can be attacked.
+    metadata:
+      title: Weak hash algorithm
+      category: Cryptography
+      aca_severity: medium
+      aca_confidence: low
+      cwe: CWE-327
+      owasp: A02:2021
+      recommendation: >-
+        For passwords use a slow KDF (argon2, bcrypt, scrypt, or
+        werkzeug.security.generate_password_hash). For integrity use SHA-256+.
+    pattern-either:
+      - pattern: hashlib.md5(...)
+      - pattern: hashlib.sha1(...)
+      - pattern: hashlib.new("md5", ...)
+      - pattern: hashlib.new("sha1", ...)
+
+  - id: aca-python-tls-verification-disabled
+    languages: [python]
+    severity: WARNING
+    message: >-
+      TLS certificate verification is disabled, so connections can be
+      intercepted (man-in-the-middle).
+    metadata:
+      title: TLS certificate verification disabled
+      category: Cryptography
+      aca_severity: medium
+      aca_confidence: high
+      cwe: CWE-295
+      owasp: A07:2021
+      recommendation: Remove verify=False. If a private CA is used, pass its bundle with verify="/path/ca.pem".
+    pattern-either:
+      - pattern: requests.$M(..., verify=False, ...)
+      - pattern: httpx.$M(..., verify=False, ...)
+      - pattern: ssl._create_unverified_context(...)
+      - pattern: $CTX.verify_mode = ssl.CERT_NONE
+
+  - id: aca-python-flask-debug-enabled
+    languages: [python]
+    severity: WARNING
+    message: >-
+      The Flask debugger is enabled. In production it exposes an interactive
+      console that allows remote code execution.
+    metadata:
+      title: Debug mode enabled
+      category: Configuration
+      aca_severity: medium
+      aca_confidence: medium
+      cwe: CWE-489
+      owasp: A05:2021
+      recommendation: Never enable debug in production; control it with an environment variable that defaults to off.
+    pattern-either:
+      - pattern: $APP.run(..., debug=True, ...)
+      - pattern: $APP.debug = True
+      - pattern: $APP.config["DEBUG"] = True
+
+  - id: aca-python-django-debug-enabled
+    languages: [python]
+    severity: WARNING
+    message: DEBUG = True in Django settings exposes stack traces, settings and SQL to visitors.
+    metadata:
+      title: Debug mode enabled
+      category: Configuration
+      aca_severity: medium
+      aca_confidence: medium
+      cwe: CWE-489
+      owasp: A05:2021
+      recommendation: Set DEBUG from an environment variable that defaults to False.
+    paths:
+      include: ["*settings*.py"]
+    pattern: DEBUG = True
+
+  - id: aca-python-ssti
+    languages: [python]
+    severity: ERROR
+    message: >-
+      A template is rendered from a non-constant string. If users influence the
+      template text, they can execute code on the server (server-side template injection).
+    metadata:
+      title: Server-side template injection
+      category: Injection
+      aca_severity: high
+      aca_confidence: medium
+      cwe: CWE-1336
+      owasp: A03:2021
+      recommendation: Render fixed template files and pass user data as variables, never as template source.
+    patterns:
+      - pattern-either:
+          - pattern: flask.render_template_string($T, ...)
+          - pattern: jinja2.Template($T, ...)
+          - pattern: jinja2.Environment(...).from_string($T, ...)
+      - pattern-not: flask.render_template_string("...", ...)
+      - pattern-not: jinja2.Template("...", ...)
+
+  - id: aca-python-xss-markup
+    languages: [python]
+    severity: WARNING
+    message: >-
+      A dynamic string is marked as safe HTML, bypassing auto-escaping. User data
+      in it leads to cross-site scripting.
+    metadata:
+      title: Auto-escaping bypassed
+      category: XSS
+      aca_severity: medium
+      aca_confidence: medium
+      cwe: CWE-79
+      owasp: A03:2021
+      recommendation: Pass data to templates unescaped-safe; only mark constant, trusted HTML as safe.
+    patterns:
+      - pattern-either:
+          - pattern: markupsafe.Markup($X)
+          - pattern: flask.Markup($X)
+          - pattern: django.utils.safestring.mark_safe($X)
+      - pattern-not: markupsafe.Markup("...")
+      - pattern-not: flask.Markup("...")
+      - pattern-not: django.utils.safestring.mark_safe("...")
+
+  - id: aca-python-path-traversal
+    languages: [python]
+    mode: taint
+    severity: ERROR
+    message: >-
+      A file path is built from request data. An attacker can use "../" to read
+      or write files outside the intended directory.
+    metadata:
+      title: Path traversal
+      category: File Security
+      aca_severity: high
+      aca_confidence: high
+      cwe: CWE-22
+      owasp: A01:2021
+      recommendation: >-
+        Use flask.send_from_directory / werkzeug.utils.safe_join, or resolve the
+        path and check it stays inside the allowed base directory.
+    pattern-sources:
+      - pattern-either:
+          - pattern: flask.request.$ATTR
+          - pattern: flask.request.$ATTR.get(...)
+          - pattern: $REQ.GET.get(...)
+          - pattern: $REQ.POST.get(...)
+    pattern-sanitizers:
+      - pattern-either:
+          - pattern: werkzeug.utils.secure_filename(...)
+          - pattern: werkzeug.utils.safe_join(...)
+          - pattern: os.path.basename(...)
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: open($P, ...)
+              - pattern: flask.send_file($P, ...)
+              - pattern: os.remove($P)
+              - pattern: os.unlink($P)
+              - pattern: shutil.rmtree($P, ...)
+          - focus-metavariable: $P
+
+  - id: aca-python-ssrf
+    languages: [python]
+    mode: taint
+    severity: ERROR
+    message: >-
+      An outgoing HTTP request uses a URL taken from request data. Attackers can
+      make the server call internal services or cloud metadata endpoints (SSRF).
+    metadata:
+      title: Server-side request forgery
+      category: SSRF
+      aca_severity: high
+      aca_confidence: high
+      cwe: CWE-918
+      owasp: A10:2021
+      recommendation: >-
+        Only call URLs from an allowlist of hosts; resolve and block private,
+        loopback and link-local addresses; disable redirects.
+    pattern-sources:
+      - pattern-either:
+          - pattern: flask.request.$ATTR
+          - pattern: flask.request.$ATTR.get(...)
+          - pattern: $REQ.GET.get(...)
+          - pattern: $REQ.POST.get(...)
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: requests.$M($URL, ...)
+              - pattern: httpx.$M($URL, ...)
+              - pattern: urllib.request.urlopen($URL, ...)
+          - focus-metavariable: $URL
+
+  - id: aca-python-sensitive-data-logged
+    languages: [python]
+    severity: WARNING
+    message: A value that looks like a password, token or secret is written to logs.
+    metadata:
+      title: Sensitive data in logs
+      category: Information Disclosure
+      aca_severity: medium
+      aca_confidence: medium
+      cwe: CWE-532
+      owasp: A09:2021
+      recommendation: Never log credentials or tokens; log an identifier or a masked value instead.
+    patterns:
+      - pattern-either:
+          - patterns:
+              - pattern-either:
+                  - pattern: logging.$L(..., $X, ...)
+                  - pattern: $LOGGER.$L(..., $X, ...)
+              - metavariable-regex:
+                  metavariable: $L
+                  regex: ^(debug|info|warning|warn|error|exception|critical|log)$
+          - pattern: print(..., $X, ...)
+      - metavariable-regex:
+          metavariable: $X
+          regex: (?i).*(password|passwd|secret|token|api_?key|private_?key|credential).*
+
+  - id: aca-python-hardcoded-credential
+    languages: [python]
+    severity: WARNING
+    message: A credential appears to be hard-coded in source code.
+    options:
+      constant_propagation: false  # report the literal, not every later use of it
+    metadata:
+      title: Hard-coded credential
+      category: Secrets
+      aca_severity: medium
+      aca_confidence: low
+      cwe: CWE-798
+      owasp: A07:2021
+      recommendation: Load secrets from environment variables or a secret manager and rotate the exposed value.
+    patterns:
+      - pattern-either:
+          - pattern: $NAME = "$VALUE"
+          - pattern: $OBJ.$NAME = "$VALUE"
+      - metavariable-regex:
+          metavariable: $NAME
+          regex: (?i)^[A-Z_]*(password|passwd|secret|secret_key|api_key|apikey|access_token|auth_token|private_key)$
+      - metavariable-regex:
+          metavariable: $VALUE
+          regex: ^(?!["']?(changeme|change-me|password|secret|xxx+|\*+|<.*>|\{.*\}|\$\{.*\})["']?$)["']?.{6,}["']?$
+
+  - id: aca-python-django-csrf-exempt
+    languages: [python]
+    severity: WARNING
+    message: The view is excluded from CSRF protection.
+    metadata:
+      title: CSRF protection disabled
+      category: API Security
+      aca_severity: medium
+      aca_confidence: medium
+      cwe: CWE-352
+      owasp: A01:2021
+      recommendation: Remove @csrf_exempt, or use token authentication for APIs that don't rely on cookies.
+    pattern: |
+      @django.views.decorators.csrf.csrf_exempt
+      def $F(...):
+        ...
+
+  - id: aca-python-jwt-signature-not-verified
+    languages: [python]
+    severity: ERROR
+    message: JWT signature verification is disabled, so anyone can forge tokens.
+    metadata:
+      title: JWT signature not verified
+      category: Authentication
+      aca_severity: high
+      aca_confidence: high
+      cwe: CWE-347
+      owasp: A07:2021
+      recommendation: Always verify signatures and pin the accepted algorithms (algorithms=["HS256"]).
+    pattern-either:
+      - pattern: |
+          jwt.decode(..., options={..., "verify_signature": False, ...}, ...)
+      - pattern: jwt.decode(..., verify=False, ...)
+      - pattern: jwt.decode(..., algorithms=[..., "none", ...], ...)
+
+  - id: aca-python-insecure-tempfile
+    languages: [python]
+    severity: INFO
+    message: tempfile.mktemp() is race-prone; another process can create the file first.
+    metadata:
+      title: Insecure temporary file
+      category: File Security
+      aca_severity: low
+      aca_confidence: high
+      cwe: CWE-377
+      owasp: A01:2021
+      recommendation: Use tempfile.mkstemp() or tempfile.NamedTemporaryFile().
+    pattern: tempfile.mktemp(...)
+
+  - id: aca-python-insecure-random-secret
+    languages: [python]
+    severity: WARNING
+    message: A security-sensitive value is generated with the non-cryptographic `random` module.
+    metadata:
+      title: Predictable random value
+      category: Cryptography
+      aca_severity: medium
+      aca_confidence: medium
+      cwe: CWE-338
+      owasp: A02:2021
+      recommendation: Use the `secrets` module (secrets.token_urlsafe, secrets.choice).
+    patterns:
+      - pattern-either:
+          - pattern: $NAME = random.$F(...)
+          - pattern: $NAME = "...".join(random.$F(...))
+          - pattern: $NAME = "...".join(random.$F(...) for $I in $R)
+      - metavariable-regex:
+          metavariable: $NAME
+          regex: (?i).*(token|secret|password|passwd|otp|nonce|salt|key).*

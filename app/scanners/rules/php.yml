@@ -1,0 +1,402 @@
+# AI Code Auditor — PHP rules (plain PHP + Laravel), own ruleset.
+rules:
+  - id: aca-php-sqli-string-built-query
+    languages: [php]
+    severity: ERROR
+    message: SQL is built by concatenating or interpolating variables. Values from users lead to SQL injection.
+    metadata:
+      title: SQL query built from strings
+      category: Injection
+      aca_severity: high
+      aca_confidence: medium
+      cwe: CWE-89
+      owasp: A03:2021
+      recommendation: >-
+        Use prepared statements ($pdo->prepare("... WHERE id = ?")->execute([$id]))
+        or Laravel's query builder / bindings (DB::select("... = ?", [$id])).
+    patterns:
+      - pattern-either:
+          - pattern: mysqli_query($C, $ARG, ...)
+          - pattern: mysql_query($ARG, ...)
+          - pattern: pg_query($C, $ARG, ...)
+          - pattern: $DB->query($ARG, ...)
+          - pattern: $DB->exec($ARG)
+          - pattern: $DB->prepare($ARG, ...)
+          - patterns:
+              - pattern: DB::$M($ARG, ...)
+              - metavariable-regex:
+                  metavariable: $M
+                  regex: ^(select|insert|update|delete|statement|unprepared|raw|affectingStatement)$
+          - patterns:
+              - pattern: $Q->$RAW($ARG, ...)
+              - metavariable-regex:
+                  metavariable: $RAW
+                  regex: ^(whereRaw|orWhereRaw|havingRaw|orderByRaw|selectRaw|groupByRaw|fromRaw|raw)$
+          - patterns:
+              - pattern-inside: |
+                  $S = $ARG;
+                  ...
+              - pattern-either:
+                  - pattern: mysqli_query($C, $S, ...)
+                  - pattern: $DB->query($S, ...)
+                  - pattern: $DB->exec($S)
+                  - pattern: DB::$M($S, ...)
+      # The query text interpolates a variable ("... $id") or concatenates one ("..." . $id).
+      - metavariable-regex:
+          metavariable: $ARG
+          regex: '^(?:"(?:[^"\\]|\\.)*(?<!\\)\$[A-Za-z_{]|.*["'']\s*\.\s*\$|\$\w+\s*\.\s*["''])'
+
+  - id: aca-php-command-injection
+    languages: [php]
+    severity: ERROR
+    message: A shell command is run with a variable. Attackers who control it can run arbitrary commands.
+    metadata:
+      title: Command injection risk
+      category: Injection
+      aca_severity: high
+      aca_confidence: medium
+      cwe: CWE-78
+      owasp: A03:2021
+      recommendation: Avoid the shell; if unavoidable, wrap every argument in escapeshellarg() and allowlist values.
+    patterns:
+      - pattern-either:
+          - pattern: exec($CMD, ...)
+          - pattern: system($CMD, ...)
+          - pattern: shell_exec($CMD)
+          - pattern: passthru($CMD, ...)
+          - pattern: popen($CMD, ...)
+          - pattern: proc_open($CMD, ...)
+          - pattern: pcntl_exec($CMD, ...)
+      - pattern-not: exec("...", ...)
+      - pattern-not: system("...", ...)
+      - pattern-not: shell_exec("...")
+      - pattern-not: passthru("...", ...)
+      - pattern-not: popen("...", ...)
+      - pattern-not: exec(escapeshellcmd(...), ...)
+      - pattern-not: system(escapeshellcmd(...), ...)
+      - pattern-not: exec("..." . escapeshellarg(...), ...)
+      - pattern-not: system("..." . escapeshellarg(...), ...)
+      - pattern-not: shell_exec("..." . escapeshellarg(...))
+
+  - id: aca-php-code-injection
+    languages: [php]
+    severity: ERROR
+    message: PHP code is evaluated from a non-constant value, allowing arbitrary code execution.
+    metadata:
+      title: Dynamic code execution
+      category: Injection
+      aca_severity: high
+      aca_confidence: medium
+      cwe: CWE-95
+      owasp: A03:2021
+      recommendation: Remove eval/assert-on-strings/create_function; use explicit logic or a lookup table.
+    pattern-either:
+      - patterns:
+          - pattern: eval($X)
+          - pattern-not: eval("...")
+      - patterns:
+          - pattern: assert($X, ...)
+          - pattern-not: assert("...", ...)
+          - metavariable-regex:
+              metavariable: $X
+              regex: ^\$
+      - pattern: create_function(...)
+      - patterns:
+          - pattern: preg_replace("$RE", ...)
+          - metavariable-regex:
+              metavariable: $RE
+              regex: ^/.*/[a-zA-Z]*e[a-zA-Z]*$
+
+  - id: aca-php-reflected-xss
+    languages: [php]
+    mode: taint
+    severity: ERROR
+    message: Request data is echoed into the page without escaping (cross-site scripting).
+    metadata:
+      title: Reflected cross-site scripting
+      category: XSS
+      aca_severity: high
+      aca_confidence: high
+      cwe: CWE-79
+      owasp: A03:2021
+      recommendation: Escape output with htmlspecialchars($v, ENT_QUOTES, 'UTF-8') or use Blade {{ }} (not {!! !!}).
+    pattern-sources:
+      - pattern-either:
+          - pattern: $_GET
+          - pattern: $_POST
+          - pattern: $_REQUEST
+          - pattern: $_COOKIE
+          - pattern: $request->input(...)
+          - pattern: $request->get(...)
+          - pattern: $request->query(...)
+    pattern-sanitizers:
+      - pattern-either:
+          - pattern: htmlspecialchars(...)
+          - pattern: htmlentities(...)
+          - pattern: e(...)
+          - pattern: strip_tags(...)
+          - pattern: intval(...)
+          - pattern: (int) $X
+          - pattern: json_encode(...)
+    pattern-sinks:
+      - pattern-either:
+          - pattern: echo ...;
+          - pattern: print(...);
+          - pattern: printf(...);
+          - pattern: response($X, ...)
+
+  - id: aca-php-blade-unescaped-output
+    languages: [generic]
+    severity: WARNING
+    message: Blade {!! !!} outputs raw HTML without escaping. Unsanitized data here leads to XSS.
+    metadata:
+      title: Unescaped template output
+      category: XSS
+      aca_severity: medium
+      aca_confidence: low
+      cwe: CWE-79
+      owasp: A03:2021
+      recommendation: Use {{ $value }} so Blade escapes it, or sanitize HTML with a vetted purifier first.
+    paths:
+      include: ["*.blade.php"]
+    pattern-regex: '\{!!\s*\$[^!]*!!\}'
+
+  - id: aca-php-file-inclusion
+    languages: [php]
+    severity: ERROR
+    message: A file is included from a non-constant path. With user input this allows local/remote file inclusion.
+    metadata:
+      title: File inclusion
+      category: File Security
+      aca_severity: high
+      aca_confidence: medium
+      cwe: CWE-98
+      owasp: A03:2021
+      recommendation: Include only fixed paths; map user choices to an allowlist of files.
+    patterns:
+      - pattern-either:
+          - pattern: include $X;
+          - pattern: include_once $X;
+          - pattern: require $X;
+          - pattern: require_once $X;
+      - pattern-not: include "...";
+      - pattern-not: include_once "...";
+      - pattern-not: require "...";
+      - pattern-not: require_once "...";
+      - pattern-not: require __DIR__ . "...";
+      - pattern-not: require_once __DIR__ . "...";
+      - pattern-not: include __DIR__ . "...";
+      - pattern-not: include_once __DIR__ . "...";
+      - pattern-not: require dirname(__DIR__) . "...";
+      - pattern-not: require_once dirname(__DIR__) . "...";
+      # A constant base path joined with a plain literal (APP_ROOT . 'lib/x.php') is fixed at runtime.
+      - metavariable-regex:
+          metavariable: $X
+          regex: ^(?![A-Z_][A-Z0-9_]*\s*\.\s*('[^']*'|"[^"$]*")$)
+
+  - id: aca-php-path-traversal
+    languages: [php]
+    mode: taint
+    severity: ERROR
+    message: A filesystem path comes from request data, allowing "../" access outside the intended folder.
+    metadata:
+      title: Path traversal
+      category: File Security
+      aca_severity: high
+      aca_confidence: high
+      cwe: CWE-22
+      owasp: A01:2021
+      recommendation: Use basename() or resolve with realpath() and check the result starts with the allowed directory.
+    pattern-sources:
+      - pattern-either:
+          - pattern: $_GET
+          - pattern: $_POST
+          - pattern: $_REQUEST
+          - pattern: $request->input(...)
+          - pattern: $request->get(...)
+          - pattern: $request->query(...)
+    pattern-sanitizers:
+      - pattern: basename(...)
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: file_get_contents($P, ...)
+              - pattern: fopen($P, ...)
+              - pattern: readfile($P, ...)
+              - pattern: file($P, ...)
+              - pattern: unlink($P, ...)
+              - pattern: file_put_contents($P, ...)
+              - pattern: Storage::get($P)
+              - pattern: response()->download($P, ...)
+          - focus-metavariable: $P
+
+  - id: aca-php-ssrf
+    languages: [php]
+    mode: taint
+    severity: ERROR
+    message: An outgoing request uses a URL from request data (server-side request forgery).
+    metadata:
+      title: Server-side request forgery
+      category: SSRF
+      aca_severity: high
+      aca_confidence: medium
+      cwe: CWE-918
+      owasp: A10:2021
+      recommendation: Allowlist destination hosts and block private, loopback and link-local addresses.
+    pattern-sources:
+      - pattern-either:
+          - pattern: $_GET
+          - pattern: $_POST
+          - pattern: $_REQUEST
+          - pattern: $request->input(...)
+          - pattern: $request->get(...)
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: curl_setopt($CH, CURLOPT_URL, $URL)
+              - pattern: curl_init($URL)
+              - pattern: Http::$M($URL, ...)
+          - focus-metavariable: $URL
+
+  - id: aca-php-unsafe-deserialization
+    languages: [php]
+    severity: ERROR
+    message: unserialize() on non-constant data can instantiate arbitrary objects (PHP object injection).
+    metadata:
+      title: Unsafe deserialization
+      category: Injection
+      aca_severity: high
+      aca_confidence: medium
+      cwe: CWE-502
+      owasp: A08:2021
+      recommendation: Use json_decode for untrusted data, or unserialize($x, ['allowed_classes' => false]).
+    patterns:
+      - pattern: unserialize($X, ...)
+      - pattern-not: unserialize("...", ...)
+      - pattern-not: "unserialize($X, ['allowed_classes' => false])"
+      - pattern-not: "unserialize($X, array('allowed_classes' => false))"
+
+  - id: aca-php-weak-password-hash
+    languages: [php]
+    severity: ERROR
+    message: A password is hashed with a fast, broken algorithm (MD5/SHA-1), so leaked hashes are easy to crack.
+    metadata:
+      title: Weak password hashing
+      category: Cryptography
+      aca_severity: high
+      aca_confidence: medium
+      cwe: CWE-916
+      owasp: A02:2021
+      recommendation: Use password_hash() / password_verify() (or Laravel's Hash::make).
+    patterns:
+      - pattern-either:
+          - pattern: md5($P)
+          - pattern: sha1($P)
+          - pattern: hash("md5", $P, ...)
+          - pattern: hash("sha1", $P, ...)
+      - metavariable-regex:
+          metavariable: $P
+          regex: (?i).*(pass|pwd).*
+
+  - id: aca-php-tls-verification-disabled
+    languages: [php]
+    severity: WARNING
+    message: cURL TLS certificate verification is disabled, so connections can be intercepted.
+    metadata:
+      title: TLS certificate verification disabled
+      category: Cryptography
+      aca_severity: medium
+      aca_confidence: high
+      cwe: CWE-295
+      owasp: A07:2021
+      recommendation: Keep CURLOPT_SSL_VERIFYPEER true and CURLOPT_SSL_VERIFYHOST 2; configure a CA bundle if needed.
+    pattern-either:
+      - pattern: curl_setopt($CH, CURLOPT_SSL_VERIFYPEER, false)
+      - pattern: curl_setopt($CH, CURLOPT_SSL_VERIFYPEER, 0)
+      - pattern: curl_setopt($CH, CURLOPT_SSL_VERIFYHOST, 0)
+      - pattern: curl_setopt($CH, CURLOPT_SSL_VERIFYHOST, false)
+      - pattern: Http::withoutVerifying()
+
+  - id: aca-php-laravel-mass-assignment
+    languages: [php]
+    severity: WARNING
+    message: The model guards no attributes, so every field (e.g. is_admin) can be mass-assigned from request data.
+    metadata:
+      title: Mass assignment
+      category: Authorization
+      aca_severity: medium
+      aca_confidence: medium
+      cwe: CWE-915
+      owasp: A01:2021
+      recommendation: Define $fillable with the exact attributes users may set.
+    pattern-regex: '(?:protected|public)\s+\$guarded\s*=\s*(?:\[\s*\]|array\(\s*\))\s*;'
+
+  - id: aca-php-sensitive-data-logged
+    languages: [php]
+    severity: WARNING
+    message: A value that looks like a password, token or secret is written to logs.
+    metadata:
+      title: Sensitive data in logs
+      category: Information Disclosure
+      aca_severity: medium
+      aca_confidence: medium
+      cwe: CWE-532
+      owasp: A09:2021
+      recommendation: Never log credentials or tokens; log an identifier or a masked value.
+    patterns:
+      - pattern-either:
+          - patterns:
+              - pattern-either:
+                  - pattern: Log::$L(..., $X, ...)
+                  - pattern: $LOGGER->$L(..., $X, ...)
+              - metavariable-regex:
+                  metavariable: $L
+                  regex: ^(debug|info|notice|warning|error|critical|alert|emergency|log)$
+          - pattern: error_log(..., $X, ...)
+          - pattern: logger(..., $X, ...)
+      - metavariable-regex:
+          metavariable: $X
+          regex: (?i).*(password|passwd|secret|token|api_?key|credential).*
+
+  - id: aca-php-hardcoded-credential
+    languages: [php]
+    severity: WARNING
+    message: A credential appears to be hard-coded in source code.
+    metadata:
+      title: Hard-coded credential
+      category: Secrets
+      aca_severity: medium
+      aca_confidence: low
+      cwe: CWE-798
+      owasp: A07:2021
+      recommendation: Load secrets with env() / config() and rotate the exposed value.
+    options:
+      constant_propagation: false
+    patterns:
+      - pattern-either:
+          - pattern: $NAME = "$VALUE";
+          - pattern: define("$NAME", "$VALUE");
+      - metavariable-regex:
+          metavariable: $NAME
+          regex: (?i)^\$?[a-z_]*(password|passwd|secret|secret_key|api_key|apikey|access_token|auth_token|private_key)$
+      - metavariable-regex:
+          metavariable: $VALUE
+          regex: ^(?!["']?(changeme|change-me|password|secret|xxx+|\*+|<.*>|\{.*\}|\$\{.*\})["']?$)["']?.{6,}["']?$
+
+  - id: aca-php-display-errors-enabled
+    languages: [php]
+    severity: WARNING
+    message: PHP errors are displayed to visitors, leaking paths, queries and stack traces.
+    metadata:
+      title: Errors displayed to users
+      category: Configuration
+      aca_severity: medium
+      aca_confidence: medium
+      cwe: CWE-209
+      owasp: A05:2021
+      recommendation: Set display_errors=0 in production and log errors instead.
+    pattern-either:
+      - pattern: ini_set("display_errors", 1)
+      - pattern: ini_set("display_errors", "1")
+      - pattern: ini_set("display_errors", "On")
+      - pattern: ini_set("display_errors", true)

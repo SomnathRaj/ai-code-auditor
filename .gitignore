@@ -1,0 +1,46 @@
+# --- Secrets (never commit) ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# --- Python ---
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# --- Tests & tooling caches ---
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# --- Local scanner installs (scripts/install-scanners.sh) ---
+.tools/
+
+# --- Runtime data ---
+instance/
+storage/
+work/
+*.log
+
+# --- Editors & OS ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# --- AI assistants: personal settings only (CLAUDE.md is shared) ---
+.claude/settings.local.json
+# ----------Planning file .md -------------
+CLAUDE.md
+DEVELOPMENT_CHECKLIST.md
+PRD.md

@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Settings · AI Code Auditor</title>
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body class="booting" data-page="app">
+  <header class="topbar">
+    <a class="brand" href="/"><span class="brand-mark">◆</span> <span class="brand-text">AI Code Auditor</span></a>
+    <nav class="nav">
+      <a href="/" >Dashboard</a>
+      <a href="/repositories.html">Repositories</a>
+      <a href="/settings.html" class="active">Settings</a>
+    </nav>
+    <div class="user">
+      <select id="org-switch" class="org-switch" aria-label="Workspace" hidden></select>
+      <span id="user-name" class="muted"></span>
+      <button id="logout-btn" class="btn btn-ghost btn-sm" type="button">Log out</button>
+    </div>
+  </header>
+  <main class="container">
+    <div class="page-head"><h1>Settings</h1></div>
+
+    <section class="card">
+      <h2>Workspace</h2>
+      <form id="org-form" class="form-grid" novalidate>
+        <label class="span-2">Name <input name="name" maxlength="120" required></label>
+        <label>Keep audits for
+          <select name="audit_days">
+            <option value="7">7 days</option><option value="30">30 days</option><option value="90">90 days</option>
+            <option value="180">180 days</option><option value="365">1 year</option><option value="0">Forever</option>
+          </select>
+          <span class="hint">Each repository's latest audit is always kept.</span></label>
+        <label>Keep uploaded ZIP source for
+          <select name="source_days">
+            <option value="0">Until replaced</option><option value="7">7 days</option><option value="30">30 days</option>
+            <option value="90">90 days</option><option value="180">180 days</option><option value="365">1 year</option>
+          </select>
+          <span class="hint">Cloned GitHub source is always deleted right after each audit.</span></label>
+        <div class="span-2"><button class="btn btn-ghost" type="submit" id="org-save">Save</button></div>
+      </form>
+      <p class="muted small" id="org-readonly" hidden>Only an owner can change these settings.</p>
+      <p class="form-error" id="org-error" hidden></p>
+      <p class="small success" id="org-ok" hidden></p>
+    </section>
+
+    <section class="card" id="members-card" hidden>
+      <h2>Members</h2>
+      <div id="members"></div>
+      <form id="member-form" class="form-row" novalidate>
+        <label class="grow">Add by email <input name="email" type="email" placeholder="colleague@company.com" required>
+          <span class="hint">They need an account first (they register, then you add them).</span></label>
+        <label>Role
+          <select name="role"><option value="developer">Developer</option><option value="viewer">Viewer</option>
+            <option value="admin">Admin</option><option value="owner">Owner</option></select></label>
+        <button class="btn btn-ghost" type="submit">Add</button>
+      </form>
+      <p class="form-error" id="member-error" hidden></p>
+      <details class="small muted roles-help"><summary>What can each role do?</summary>
+        <ul>
+          <li><b>Owner</b>: everything, including workspace settings and managing owners and admins.</li>
+          <li><b>Admin</b>: repositories, developers and viewers, the activity log.</li>
+          <li><b>Developer</b>: run audits, triage findings, comment, upload new source versions.</li>
+          <li><b>Viewer</b>: read-only.</li>
+        </ul>
+      </details>
+    </section>
+
+    <section class="card" id="logs-card" hidden>
+      <div class="card-head">
+        <h2>Activity log</h2>
+        <label class="inline small">Show
+          <select id="log-filter">
+            <option value="">Everything</option><option value="user.*">Sign-ins &amp; accounts</option>
+            <option value="member.*">Members</option><option value="repository.*">Repositories</option>
+            <option value="audit.*">Audits</option><option value="finding.*">Findings</option>
+            <option value="report.*">Reports</option><option value="organization.*">Workspace settings</option>
+            <option value="retention.*">Data retention</option><option value="auth.*">Security events</option>
+          </select></label>
+      </div>
+      <div id="logs"></div>
+      <div class="pager" id="logs-pager"></div>
+    </section>
+
+    <section class="card">
+      <h2>Leave workspace</h2>
+      <p class="muted small">You'll lose access to its repositories and audits. The last owner can't leave.</p>
+      <button class="btn btn-danger" type="button" id="leave-btn">Leave this workspace</button>
+      <p class="form-error" id="leave-error" hidden></p>
+    </section>
+  </main>
+  <script src="/js/api.js"></script>
+  <script src="/js/settings.js"></script>
+</body>
+</html>

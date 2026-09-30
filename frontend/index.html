@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard · AI Code Auditor</title>
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body class="booting" data-page="app">
+  <header class="topbar">
+    <a class="brand" href="/"><span class="brand-mark">◆</span> <span class="brand-text">AI Code Auditor</span></a>
+    <nav class="nav">
+      <a href="/" class="active">Dashboard</a>
+      <a href="/repositories.html" >Repositories</a>
+      <a href="/settings.html">Settings</a>
+    </nav>
+    <div class="user">
+      <select id="org-switch" class="org-switch" aria-label="Workspace" hidden></select>
+      <span id="user-name" class="muted"></span>
+      <button id="logout-btn" class="btn btn-ghost btn-sm" type="button">Log out</button>
+    </div>
+  </header>
+  <main class="container">
+    <div class="page-head">
+      <h1>Security overview</h1>
+      <a class="btn btn-primary" href="/repositories.html" id="add-repo-link">Add repository</a>
+    </div>
+
+    <section class="grid grid-sev" id="severity-cards"></section>
+
+    <section class="grid grid-2">
+      <div class="card">
+        <h2>Security score</h2>
+        <div class="score" id="score">–</div>
+        <p class="muted small">Based on open findings in each repository's latest audit. An indicator, not proof of security.</p>
+      </div>
+      <div class="card">
+        <h2>Open findings by severity</h2>
+        <div id="severity-bars" class="bars"></div>
+      </div>
+    </section>
+
+    <section class="card" id="trends-card">
+      <div class="card-head">
+        <h2>Trends</h2>
+        <label class="inline small">Range
+          <select id="trend-days">
+            <option value="30">Last 30 days</option><option value="90" selected>Last 90 days</option>
+            <option value="365">Last 12 months</option>
+          </select></label>
+      </div>
+      <div class="grid grid-3 trend-stats" id="trend-stats"></div>
+      <div id="trend-empty" hidden></div>
+      <div class="grid grid-2eq" id="trend-charts">
+        <div><h3 class="chart-title">Open findings, all repositories</h3><div id="chart-open"></div></div>
+        <div><h3 class="chart-title">Security score, all repositories</h3><div id="chart-score"></div></div>
+      </div>
+      <details class="table-view"><summary class="small">Show as table</summary><div id="trend-table"></div></details>
+    </section>
+
+    <section class="card" id="recurring-card" hidden>
+      <h2>Recurring issues</h2>
+      <p class="muted small">Still open and already reported in earlier audits of the same repository.</p>
+      <div id="recurring"></div>
+    </section>
+
+    <section class="card">
+      <h2>Recent audits</h2>
+      <div id="recent-audits"></div>
+    </section>
+  </main>
+  <script src="/js/api.js"></script>
+  <script src="/js/chart.js"></script>
+  <script src="/js/dashboard.js"></script>
+</body>
+</html>

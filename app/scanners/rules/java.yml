@@ -1,0 +1,116 @@
+# AI Code Auditor — Java rules (own ruleset).
+rules:
+  - id: aca-java-sqli-string-built-query
+    languages: [java]
+    severity: ERROR
+    message: SQL is built by string concatenation and executed. Values from users lead to SQL injection.
+    metadata:
+      title: SQL query built from strings
+      category: Injection
+      aca_severity: high
+      aca_confidence: medium
+      cwe: CWE-89
+      owasp: A03:2021
+      recommendation: Use PreparedStatement with ? placeholders, or JPA named parameters.
+    patterns:
+      - pattern-either:
+          - pattern: $ST.$EXEC("..." + $X, ...)
+          - pattern: $ST.$EXEC($X + "...", ...)
+          - pattern: $ST.$EXEC(String.format(...), ...)
+          - patterns:
+              - pattern-inside: |
+                  String $S = "..." + $X;
+                  ...
+              - pattern: $ST.$EXEC($S, ...)
+      - metavariable-regex:
+          metavariable: $EXEC
+          regex: ^(executeQuery|executeUpdate|execute|addBatch|prepareStatement|createQuery|createNativeQuery|query|queryForList|queryForObject|update)$
+
+  - id: aca-java-command-injection
+    languages: [java]
+    severity: ERROR
+    message: An OS command is run with a non-constant value; attackers controlling it can run arbitrary commands.
+    metadata:
+      title: Command injection risk
+      category: Injection
+      aca_severity: high
+      aca_confidence: medium
+      cwe: CWE-78
+      owasp: A03:2021
+      recommendation: Use ProcessBuilder with a fixed program and separate, validated arguments; never invoke a shell.
+    pattern-either:
+      - patterns:
+          - pattern: Runtime.getRuntime().exec($CMD, ...)
+          - pattern-not: Runtime.getRuntime().exec("...", ...)
+      - pattern: new ProcessBuilder("sh", "-c", $CMD, ...)
+      - pattern: new ProcessBuilder("bash", "-c", $CMD, ...)
+      - pattern: new ProcessBuilder("cmd", "/c", $CMD, ...)
+
+  - id: aca-java-unsafe-deserialization
+    languages: [java]
+    severity: WARNING
+    message: Java native deserialization of untrusted data can lead to remote code execution via gadget chains.
+    metadata:
+      title: Unsafe deserialization
+      category: Injection
+      aca_severity: high
+      aca_confidence: low
+      cwe: CWE-502
+      owasp: A08:2021
+      recommendation: Avoid ObjectInputStream for untrusted data; use JSON, or an ObjectInputFilter allowlist.
+    pattern: (ObjectInputStream $O).readObject()
+
+  - id: aca-java-weak-hash
+    languages: [java]
+    severity: WARNING
+    message: MD5/SHA-1 are broken for security purposes.
+    metadata:
+      title: Weak hash algorithm
+      category: Cryptography
+      aca_severity: medium
+      aca_confidence: low
+      cwe: CWE-327
+      owasp: A02:2021
+      recommendation: Use SHA-256+ for integrity, and bcrypt/Argon2 (e.g. Spring Security PasswordEncoder) for passwords.
+    patterns:
+      - pattern: MessageDigest.getInstance("$ALG", ...)
+      - metavariable-regex:
+          metavariable: $ALG
+          regex: (?i)^(md5|md4|sha-?1)$
+
+  - id: aca-java-trust-all-certificates
+    languages: [java]
+    severity: ERROR
+    message: A TrustManager or HostnameVerifier accepts every certificate/host, disabling TLS protection.
+    metadata:
+      title: TLS certificate verification disabled
+      category: Cryptography
+      aca_severity: high
+      aca_confidence: medium
+      cwe: CWE-295
+      owasp: A07:2021
+      recommendation: Use the default TrustManager/HostnameVerifier; add private CAs to a trust store instead.
+    pattern-either:
+      - pattern: |
+          public void checkServerTrusted(...) {}
+      - pattern: |
+          public boolean verify(String $H, SSLSession $S) { return true; }
+      - pattern: (HostnameVerifier $V) -> true
+      - pattern: NoopHostnameVerifier.INSTANCE
+
+  - id: aca-java-spring-csrf-disabled
+    languages: [java]
+    severity: WARNING
+    message: Spring Security CSRF protection is disabled.
+    metadata:
+      title: CSRF protection disabled
+      category: API Security
+      aca_severity: medium
+      aca_confidence: medium
+      cwe: CWE-352
+      owasp: A01:2021
+      recommendation: Keep CSRF enabled for cookie-authenticated endpoints; disable it only for stateless token APIs.
+    pattern-either:
+      - pattern: $HTTP.csrf().disable()
+      - pattern: $HTTP.csrf($C -> $C.disable())
+      - pattern: $HTTP.csrf(AbstractHttpConfigurer::disable)

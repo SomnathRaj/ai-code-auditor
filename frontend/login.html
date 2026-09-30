@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Log in · AI Code Auditor</title>
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body class="auth-page booting" data-page="auth">
+  <main class="auth-card card">
+    <div class="brand auth-brand"><span class="brand-mark">◆</span> AI Code Auditor</div>
+    <h1>Log in</h1>
+    <p class="muted">Find security vulnerabilities before attackers do.</p>
+    <form id="auth-form" data-endpoint="/auth/login" novalidate>
+      <label>Email <input name="email" type="email" autocomplete="email" required></label>
+      <label>Password <input name="password" type="password" autocomplete="current-password" required></label>
+      <p class="form-error" id="form-error" hidden></p>
+      <button class="btn btn-primary btn-block" type="submit">Log in</button>
+    </form>
+    <p class="muted small">No account? <a href="/register.html">Create one</a></p>
+  </main>
+  <script src="/js/api.js"></script>
+  <script src="/js/auth.js"></script>
+</body>
+</html>

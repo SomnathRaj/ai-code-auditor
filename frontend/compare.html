@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Compare audits · AI Code Auditor</title>
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body class="booting" data-page="app">
+  <header class="topbar">
+    <a class="brand" href="/"><span class="brand-mark">◆</span> <span class="brand-text">AI Code Auditor</span></a>
+    <nav class="nav">
+      <a href="/" >Dashboard</a>
+      <a href="/repositories.html" class="active">Repositories</a>
+      <a href="/settings.html">Settings</a>
+    </nav>
+    <div class="user">
+      <select id="org-switch" class="org-switch" aria-label="Workspace" hidden></select>
+      <span id="user-name" class="muted"></span>
+      <button id="logout-btn" class="btn btn-ghost btn-sm" type="button">Log out</button>
+    </div>
+  </header>
+  <main class="container">
+    <div class="page-head">
+      <div>
+        <a class="muted small" id="back-link" href="/">← Audit</a>
+        <h1 id="title">Compare audits</h1>
+        <p class="muted" id="subtitle"></p>
+      </div>
+      <label>Compare with <select id="base-select"></select></label>
+    </div>
+    <p class="form-error" id="error" hidden></p>
+    <section class="grid grid-sev" id="tiles"></section>
+    <section class="card">
+      <div class="tabs" role="tablist" id="tabs"></div>
+      <div id="list"></div>
+      <p class="muted small" id="truncated" hidden>Showing the first 500 of each list.</p>
+    </section>
+  </main>
+  <script src="/js/api.js"></script>
+  <script src="/js/compare.js"></script>
+</body>
+</html>

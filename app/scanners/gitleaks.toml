@@ -1,0 +1,7 @@
+# Explicit Gitleaks config so a scanned repository's own .gitleaks.toml can't
+# disable rules. Uses the built-in default ruleset; per-audit path exclusions
+# are appended at run time.
+title = "AI Code Auditor"
+
+[extend]
+useDefault = true

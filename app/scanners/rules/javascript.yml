@@ -1,0 +1,447 @@
+# AI Code Auditor — JavaScript / TypeScript rules (own ruleset).
+rules:
+  - id: aca-js-code-injection
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: eval()/new Function() runs a non-constant string as code. User influence means arbitrary code execution.
+    metadata:
+      title: Dynamic code execution
+      category: Injection
+      aca_severity: high
+      aca_confidence: medium
+      cwe: CWE-95
+      owasp: A03:2021
+      recommendation: Remove eval/new Function; use JSON.parse for data or a lookup table of allowed operations.
+    pattern-either:
+      - patterns:
+          - pattern-either:
+              - pattern: eval($X)
+              - pattern: new Function(..., $X)
+          - pattern-not: eval("...")
+          - pattern-not: new Function(..., "...")
+      - patterns:
+          - pattern-either:
+              - pattern: setTimeout($X, ...)
+              - pattern: setInterval($X, ...)
+          - pattern-not: setTimeout(function (...) {...}, ...)
+          - pattern-not: setTimeout((...) => {...}, ...)
+          - pattern-not: setTimeout((...) => $E, ...)
+          - pattern-not: setInterval(function (...) {...}, ...)
+          - pattern-not: setInterval((...) => {...}, ...)
+          - pattern-not: setInterval((...) => $E, ...)
+          # A function reference (setTimeout(tick, 10)) is not code-from-string.
+          - metavariable-regex:
+              metavariable: $X
+              regex: ^(?![A-Za-z_$][\w$.]*$)
+
+  - id: aca-js-command-injection
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: A shell command is built from a non-constant value. Attackers controlling it can run arbitrary commands.
+    metadata:
+      title: Command injection risk
+      category: Injection
+      aca_severity: high
+      aca_confidence: medium
+      cwe: CWE-78
+      owasp: A03:2021
+      recommendation: Use execFile/spawn with an argument array (no shell) and validate inputs against an allowlist.
+    patterns:
+      - pattern-either:
+          - patterns:
+              - pattern-either:
+                  - pattern: $CP.exec($CMD, ...)
+                  - pattern: $CP.execSync($CMD, ...)
+                  - pattern: |
+                      $CP.spawn($CMD, $ARGS, {..., shell: true, ...})
+              # Exclude RegExp#exec on regex literals (/re/.exec(str)) and regex-named variables.
+              - metavariable-regex:
+                  metavariable: $CP
+                  regex: (?i)^(?!/)(?!.*(re|regex|regexp|pattern)$)
+          - pattern: exec($CMD, ...)
+          - pattern: execSync($CMD, ...)
+      - pattern-not: $CP.exec("...", ...)
+      - pattern-not: $CP.execSync("...", ...)
+      - pattern-not: exec("...", ...)
+      - pattern-not: execSync("...", ...)
+
+  - id: aca-js-sqli-string-built-query
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: SQL is built with string concatenation or a template literal. Values from users lead to SQL injection.
+    metadata:
+      title: SQL query built from strings
+      category: Injection
+      aca_severity: high
+      aca_confidence: medium
+      cwe: CWE-89
+      owasp: A03:2021
+      recommendation: Use placeholders (db.query("... WHERE id = ?", [id])) or the ORM's query builder.
+    patterns:
+      - pattern-either:
+          - pattern: $DB.$Q(`...${$X}...`, ...)
+          - pattern: $DB.$Q("..." + $X, ...)
+          - pattern: $DB.$Q($X + "...", ...)
+          - patterns:
+              - pattern-either:
+                  - pattern-inside: |
+                      $S = `...${$X}...`;
+                      ...
+                  - pattern-inside: |
+                      $S = "..." + $X;
+                      ...
+                  - pattern-inside: |
+                      const $S = `...${$X}...`;
+                      ...
+                  - pattern-inside: |
+                      let $S = `...${$X}...`;
+                      ...
+                  - pattern-inside: |
+                      const $S = "..." + $X;
+                      ...
+              - pattern: $DB.$Q($S, ...)
+      - metavariable-regex:
+          metavariable: $Q
+          regex: ^(query|execute|raw|\$queryRawUnsafe|\$executeRawUnsafe|unsafe)$
+
+  - id: aca-js-dom-xss
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: Dynamic HTML is written into the page without escaping (DOM XSS).
+    metadata:
+      title: Unescaped HTML in the DOM
+      category: XSS
+      aca_severity: medium
+      aca_confidence: medium
+      cwe: CWE-79
+      owasp: A03:2021
+      recommendation: Use textContent / createElement, or sanitize with DOMPurify before inserting HTML.
+    patterns:
+      - pattern-either:
+          - pattern: $EL.innerHTML = $X
+          - pattern: $EL.outerHTML = $X
+          - pattern: $EL.insertAdjacentHTML($POS, $X)
+          - pattern: document.write($X)
+          - pattern: document.writeln($X)
+      - pattern-not: $EL.innerHTML = "..."
+      - pattern-not: $EL.outerHTML = "..."
+      - pattern-not: $EL.insertAdjacentHTML($POS, "...")
+      - pattern-not: document.write("...")
+      - pattern-not: $EL.innerHTML = DOMPurify.sanitize(...)
+
+  - id: aca-js-react-dangerously-set-inner-html
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: dangerouslySetInnerHTML renders raw HTML; unsanitized data leads to XSS.
+    metadata:
+      title: Unescaped HTML in React
+      category: XSS
+      aca_severity: medium
+      aca_confidence: medium
+      cwe: CWE-79
+      owasp: A03:2021
+      recommendation: Render data as JSX text, or sanitize with DOMPurify.sanitize() first.
+    patterns:
+      - pattern: |
+          <$EL dangerouslySetInnerHTML={{__html: $X}} />
+      - pattern-not: |
+          <$EL dangerouslySetInnerHTML={{__html: DOMPurify.sanitize(...)}} />
+      - pattern-not: |
+          <$EL dangerouslySetInnerHTML={{__html: "..."}} />
+
+  - id: aca-js-express-reflected-xss
+    languages: [javascript, typescript]
+    mode: taint
+    severity: ERROR
+    message: Request data is written directly into the response. Reflected input can execute script in the victim's browser.
+    metadata:
+      title: Reflected cross-site scripting
+      category: XSS
+      aca_severity: high
+      aca_confidence: medium
+      cwe: CWE-79
+      owasp: A03:2021
+      recommendation: Render through an auto-escaping template engine or send JSON (res.json) instead of raw strings.
+    pattern-sources:
+      - pattern-either:
+          - pattern: $REQ.query
+          - pattern: $REQ.params
+          - pattern: $REQ.body
+          - pattern: $REQ.cookies
+    pattern-sanitizers:
+      - pattern-either:
+          - pattern: escape(...)
+          - pattern: escapeHtml(...)
+          - pattern: encodeURIComponent(...)
+          - pattern: DOMPurify.sanitize(...)
+          - pattern: parseInt(...)
+          - pattern: Number(...)
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: $RES.send($X)
+              - pattern: $RES.write($X)
+              - pattern: $RES.end($X)
+          - focus-metavariable: $X
+
+  - id: aca-js-path-traversal
+    languages: [javascript, typescript]
+    mode: taint
+    severity: ERROR
+    message: A filesystem path is built from request data. "../" sequences can reach files outside the intended folder.
+    metadata:
+      title: Path traversal
+      category: File Security
+      aca_severity: high
+      aca_confidence: high
+      cwe: CWE-22
+      owasp: A01:2021
+      recommendation: Use path.basename or resolve the path and verify it starts with the allowed base directory.
+    pattern-sources:
+      - pattern-either:
+          - pattern: $REQ.query
+          - pattern: $REQ.params
+          - pattern: $REQ.body
+    pattern-sanitizers:
+      - pattern: path.basename(...)
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: $FS.readFile($P, ...)
+              - pattern: $FS.readFileSync($P, ...)
+              - pattern: $FS.createReadStream($P, ...)
+              - pattern: $FS.writeFile($P, ...)
+              - pattern: $FS.writeFileSync($P, ...)
+              - pattern: $FS.unlink($P, ...)
+              - pattern: $FS.unlinkSync($P, ...)
+              - pattern: $RES.sendFile($P, ...)
+              - pattern: $RES.download($P, ...)
+          - focus-metavariable: $P
+
+  - id: aca-js-ssrf
+    languages: [javascript, typescript]
+    mode: taint
+    severity: ERROR
+    message: An outgoing request uses a URL from request data, letting attackers reach internal services (SSRF).
+    metadata:
+      title: Server-side request forgery
+      category: SSRF
+      aca_severity: high
+      aca_confidence: high
+      cwe: CWE-918
+      owasp: A10:2021
+      recommendation: Allowlist destination hosts and block private, loopback and link-local addresses.
+    pattern-sources:
+      - pattern-either:
+          - pattern: $REQ.query
+          - pattern: $REQ.params
+          - pattern: $REQ.body
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: fetch($URL, ...)
+              - pattern: axios($URL, ...)
+              - pattern: axios.$M($URL, ...)
+              - pattern: $HTTP.get($URL, ...)
+              - pattern: $HTTP.request($URL, ...)
+              - pattern: got($URL, ...)
+          - focus-metavariable: $URL
+
+  - id: aca-js-nosql-injection
+    languages: [javascript, typescript]
+    mode: taint
+    severity: ERROR
+    message: >-
+      Request data is used directly as a MongoDB query. Attackers can send
+      operators such as {"$ne": null} to bypass checks (NoSQL injection).
+    metadata:
+      title: NoSQL injection
+      category: Injection
+      aca_severity: high
+      aca_confidence: medium
+      cwe: CWE-943
+      owasp: A03:2021
+      recommendation: Cast inputs to the expected type (String(value)) and build the query object explicitly; consider express-mongo-sanitize.
+    pattern-sources:
+      - pattern-either:
+          - pattern: $REQ.body
+          - pattern: $REQ.query
+    pattern-sanitizers:
+      - pattern-either:
+          - pattern: String(...)
+          - pattern: Number(...)
+          - pattern: sanitize(...)
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: $M.find($Q, ...)
+              - pattern: $M.findOne($Q, ...)
+              - pattern: $M.updateOne($Q, ...)
+              - pattern: $M.deleteOne($Q, ...)
+              - pattern: $M.deleteMany($Q, ...)
+              - pattern: $M.countDocuments($Q, ...)
+          - focus-metavariable: $Q
+
+  - id: aca-js-open-redirect
+    languages: [javascript, typescript]
+    mode: taint
+    severity: WARNING
+    message: The redirect target comes from request data, enabling phishing via trusted links (open redirect).
+    metadata:
+      title: Open redirect
+      category: API Security
+      aca_severity: medium
+      aca_confidence: medium
+      cwe: CWE-601
+      owasp: A01:2021
+      recommendation: Redirect only to relative paths or an allowlist of destinations.
+    pattern-sources:
+      - pattern-either:
+          - pattern: $REQ.query
+          - pattern: $REQ.params
+          - pattern: $REQ.body
+    pattern-sinks:
+      - patterns:
+          - pattern: $RES.redirect($URL)
+          - focus-metavariable: $URL
+
+  - id: aca-js-tls-verification-disabled
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: TLS certificate verification is disabled, so connections can be intercepted.
+    metadata:
+      title: TLS certificate verification disabled
+      category: Cryptography
+      aca_severity: medium
+      aca_confidence: high
+      cwe: CWE-295
+      owasp: A07:2021
+      recommendation: Remove rejectUnauthorized:false / NODE_TLS_REJECT_UNAUTHORIZED=0; trust a private CA with the `ca` option.
+    pattern-either:
+      - pattern: "{..., rejectUnauthorized: false, ...}"
+      - pattern: process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0"
+      - pattern: process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = "0"
+
+  - id: aca-js-weak-hash
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: MD5/SHA-1 are broken for security purposes.
+    metadata:
+      title: Weak hash algorithm
+      category: Cryptography
+      aca_severity: medium
+      aca_confidence: low
+      cwe: CWE-327
+      owasp: A02:2021
+      recommendation: For passwords use bcrypt/argon2/scrypt; for integrity use SHA-256 or stronger.
+    patterns:
+      - pattern: $CRYPTO.createHash("$ALG")
+      - metavariable-regex:
+          metavariable: $ALG
+          regex: (?i)^(md5|sha1|md4)$
+
+  - id: aca-js-insecure-random-secret
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: A security-sensitive value is generated with Math.random(), which is predictable.
+    metadata:
+      title: Predictable random value
+      category: Cryptography
+      aca_severity: medium
+      aca_confidence: medium
+      cwe: CWE-338
+      owasp: A02:2021
+      recommendation: Use crypto.randomBytes / crypto.randomUUID / crypto.getRandomValues.
+    patterns:
+      - pattern-either:
+          - pattern: $NAME = <... Math.random() ...>
+          - pattern: const $NAME = <... Math.random() ...>
+          - pattern: let $NAME = <... Math.random() ...>
+      - metavariable-regex:
+          metavariable: $NAME
+          regex: (?i).*(token|secret|password|passwd|otp|nonce|salt|apikey|api_key|session).*
+
+  - id: aca-js-sensitive-data-logged
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: A value that looks like a password, token or secret is written to logs.
+    metadata:
+      title: Sensitive data in logs
+      category: Information Disclosure
+      aca_severity: medium
+      aca_confidence: medium
+      cwe: CWE-532
+      owasp: A09:2021
+      recommendation: Never log credentials or tokens; log an identifier or a masked value.
+    patterns:
+      - pattern-either:
+          - pattern: console.$L(..., $X, ...)
+          - pattern: $LOGGER.$L(..., $X, ...)
+      - metavariable-regex:
+          metavariable: $L
+          regex: ^(log|info|debug|warn|error|trace)$
+      - metavariable-regex:
+          metavariable: $X
+          regex: (?i).*(password|passwd|secret|token|apikey|api_key|privatekey|credential).*
+
+  - id: aca-js-cors-any-origin-with-credentials
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: CORS allows any origin together with credentials, so any website can make authenticated requests.
+    metadata:
+      title: Permissive CORS with credentials
+      category: API Security
+      aca_severity: medium
+      aca_confidence: high
+      cwe: CWE-942
+      owasp: A05:2021
+      recommendation: List the exact allowed origins when credentials are enabled.
+    pattern-either:
+      - pattern: "cors({..., origin: '*', ..., credentials: true, ...})"
+      - pattern: "cors({..., credentials: true, ..., origin: '*', ...})"
+      - pattern: "cors({..., origin: true, ..., credentials: true, ...})"
+      - pattern: "cors({..., credentials: true, ..., origin: true, ...})"
+
+  - id: aca-js-hardcoded-credential
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: A credential appears to be hard-coded in source code.
+    options:
+      constant_propagation: false  # report the literal, not every later use of it
+    metadata:
+      title: Hard-coded credential
+      category: Secrets
+      aca_severity: medium
+      aca_confidence: low
+      cwe: CWE-798
+      owasp: A07:2021
+      recommendation: Load secrets from environment variables or a secret manager, and rotate the exposed value.
+    patterns:
+      - pattern-either:
+          - pattern: const $NAME = "$VALUE"
+          - pattern: let $NAME = "$VALUE"
+          - pattern: var $NAME = "$VALUE"
+          - pattern: "{..., $NAME: '$VALUE', ...}"
+      - metavariable-regex:
+          metavariable: $NAME
+          regex: (?i)^[a-z_]*(password|passwd|secret|secretkey|secret_key|apikey|api_key|accesstoken|access_token|authtoken|privatekey|private_key)$
+      - focus-metavariable: $VALUE
+      - metavariable-regex:
+          metavariable: $VALUE
+          regex: ^(?!["']?(changeme|change-me|password|secret|xxx+|\*+|<.*>|\{.*\}|\$\{.*\})["']?$)["']?.{6,}["']?$
+
+  - id: aca-js-jwt-weak-verification
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: The JWT is decoded without verification, or 'none' is accepted as an algorithm, so tokens can be forged.
+    metadata:
+      title: JWT signature not verified
+      category: Authentication
+      aca_severity: high
+      aca_confidence: medium
+      cwe: CWE-347
+      owasp: A07:2021
+      recommendation: Use jwt.verify() with an explicit algorithms list that excludes 'none'.
+    pattern-either:
+      - pattern: "$JWT.verify($T, $K, {..., algorithms: [..., 'none', ...], ...}, ...)"
+      - pattern: "$JWT.verify($T, $K, {..., algorithms: [..., \"none\", ...], ...}, ...)"

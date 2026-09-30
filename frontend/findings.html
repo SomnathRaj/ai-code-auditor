@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Findings · AI Code Auditor</title>
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body class="booting" data-page="app">
+  <header class="topbar">
+    <a class="brand" href="/"><span class="brand-mark">◆</span> <span class="brand-text">AI Code Auditor</span></a>
+    <nav class="nav">
+      <a href="/" >Dashboard</a>
+      <a href="/repositories.html" class="active">Repositories</a>
+      <a href="/settings.html">Settings</a>
+    </nav>
+    <div class="user">
+      <select id="org-switch" class="org-switch" aria-label="Workspace" hidden></select>
+      <span id="user-name" class="muted"></span>
+      <button id="logout-btn" class="btn btn-ghost btn-sm" type="button">Log out</button>
+    </div>
+  </header>
+  <main class="container">
+    <div class="page-head">
+      <div>
+        <a class="muted small" id="back-link" href="/">← Audit</a>
+        <h1 id="title">Findings</h1>
+        <p class="muted" id="subtitle"></p>
+      </div>
+    </div>
+
+    <section class="card">
+      <form id="filters" class="filters" novalidate>
+        <label class="grow">Search <input name="q" type="search" placeholder="Title or rule"></label>
+        <label>File <input name="file" placeholder="Path contains"></label>
+        <label>Status
+          <select name="status">
+            <option value="open">Open</option><option value="">All</option><option value="closed">Closed</option>
+            <option value="new">New</option><option value="confirmed">Confirmed</option><option value="in_progress">In progress</option>
+            <option value="resolved">Resolved</option><option value="verified">Verified</option>
+            <option value="false_positive">False positive</option><option value="accepted_risk">Accepted risk</option>
+            <option value="ignored">Ignored</option>
+          </select></label>
+        <label>Category <select name="category"><option value="">All</option></select></label>
+        <label>Scanner <select name="scanner"><option value="">All</option></select></label>
+        <label>AI verdict
+          <select name="ai_verdict">
+            <option value="">All</option><option value="true_positive">Likely real</option>
+            <option value="false_positive">Likely false positive</option><option value="needs_more_context">Needs context</option>
+            <option value="none">Not analysed</option>
+          </select></label>
+        <label>Sort
+          <select name="sort">
+            <option value="severity">Severity</option><option value="file">File</option>
+            <option value="confidence">Confidence</option><option value="ai_false_positive">Most likely false positive</option>
+          </select></label>
+      </form>
+      <div class="chips sev-filter" id="sev-filter" role="group" aria-label="Severity"></div>
+    </section>
+
+    <section class="card">
+      <p class="muted small" id="result-count"></p>
+      <div id="list"></div>
+      <div class="pager" id="pager"></div>
+    </section>
+  </main>
+  <script src="/js/api.js"></script>
+  <script src="/js/findings.js"></script>
+</body>
+</html>

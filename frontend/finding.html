@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Finding · AI Code Auditor</title>
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body class="booting" data-page="app">
+  <header class="topbar">
+    <a class="brand" href="/"><span class="brand-mark">◆</span> <span class="brand-text">AI Code Auditor</span></a>
+    <nav class="nav">
+      <a href="/" >Dashboard</a>
+      <a href="/repositories.html" class="active">Repositories</a>
+      <a href="/settings.html">Settings</a>
+    </nav>
+    <div class="user">
+      <select id="org-switch" class="org-switch" aria-label="Workspace" hidden></select>
+      <span id="user-name" class="muted"></span>
+      <button id="logout-btn" class="btn btn-ghost btn-sm" type="button">Log out</button>
+    </div>
+  </header>
+  <main class="container">
+    <p class="muted" id="loading">Loading…</p>
+    <div id="finding" hidden>
+      <div class="page-head">
+        <div>
+          <a class="muted small" id="back-link" href="/">← Findings</a>
+          <h1 id="title"></h1>
+          <div class="chips" id="badges"></div>
+        </div>
+      </div>
+
+      <section class="grid grid-2">
+        <div class="card">
+          <h2>Overview</h2>
+          <dl class="details" id="overview"></dl>
+        </div>
+        <div class="card" id="triage-card">
+          <h2>Status</h2>
+          <p><span class="badge" id="status-badge"></span></p>
+          <form id="triage-form" hidden novalidate>
+            <div class="actions wrap" id="transitions"></div>
+            <label id="reason-label" hidden>Reason <textarea name="comment" rows="2" maxlength="5000"
+              placeholder="Why? (required for false positive, accepted risk and ignored)"></textarea></label>
+            <p class="form-error" id="triage-error" hidden></p>
+          </form>
+          <ol class="history" id="history"></ol>
+        </div>
+      </section>
+
+      <section class="card" id="ai-card" hidden>
+        <div class="card-head"><h2>AI analysis</h2><span class="muted small" id="ai-meta"></span></div>
+        <div id="ai-body"></div>
+      </section>
+
+      <section class="card">
+        <div class="card-head"><h2>Code</h2><span class="muted small" id="code-meta"></span></div>
+        <div class="code-layout" id="code-layout">
+          <div class="code-pane"><div class="code" id="code" role="region" aria-label="Vulnerable code"></div></div>
+          <div class="code-pane" id="fix-pane" hidden>
+            <p class="small muted pane-title">Suggested fix (AI)</p>
+            <div class="code fix" id="fix"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="grid grid-2">
+        <div class="card">
+          <h2>Explanation</h2>
+          <div id="explanation"></div>
+        </div>
+        <div class="card">
+          <h2>Recommended fix</h2>
+          <div id="recommendation"></div>
+          <h2 class="spaced">References</h2>
+          <ul class="refs" id="references"></ul>
+        </div>
+      </section>
+
+      <section class="card" id="evidence-card" hidden>
+        <h2>Evidence</h2>
+        <dl class="details" id="evidence"></dl>
+      </section>
+
+      <section class="card">
+        <h2>Comments</h2>
+        <ol class="comments" id="comments"></ol>
+        <form id="comment-form" hidden novalidate>
+          <label>Add a comment <textarea name="body" rows="3" maxlength="5000"></textarea></label>
+          <button class="btn btn-ghost" type="submit">Comment</button>
+          <p class="form-error" id="comment-error" hidden></p>
+        </form>
+      </section>
+    </div>
+  </main>
+  <script src="/js/api.js"></script>
+  <script src="/js/highlight.js"></script>
+  <script src="/js/finding.js"></script>
+</body>
+</html>

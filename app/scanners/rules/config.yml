@@ -1,0 +1,35 @@
+# AI Code Auditor — configuration files (PRD §22). Generic/regex rules scoped by path.
+rules:
+  - id: aca-config-debug-enabled
+    languages: [generic]
+    severity: WARNING
+    message: Debug mode is enabled in an environment/config file. In production it exposes stack traces and internals.
+    metadata:
+      title: Debug mode enabled
+      category: Configuration
+      aca_severity: medium
+      aca_confidence: medium
+      cwe: CWE-489
+      owasp: A05:2021
+      recommendation: Disable debug in production environments; keep example files with debug off.
+    paths:
+      include: [".env", ".env.*", "*.env", "*.ini", "*.cfg"]
+      exclude: [".env.example", ".env.sample", ".env.dist", ".env.template", ".env.local", ".env.development", ".env.test", ".env.testing"]
+    pattern-regex: (?im)^\s*(APP_DEBUG|DEBUG|FLASK_DEBUG|DJANGO_DEBUG)\s*=\s*["']?(true|1|on|yes)["']?\s*$
+
+  - id: aca-config-insecure-session-cookie
+    languages: [generic]
+    severity: WARNING
+    message: Session cookies are configured without the Secure flag, so they can be sent over plain HTTP.
+    metadata:
+      title: Insecure session cookie
+      category: Configuration
+      aca_severity: medium
+      aca_confidence: medium
+      cwe: CWE-614
+      owasp: A05:2021
+      recommendation: Set the session cookie Secure (and HttpOnly, SameSite) in production.
+    paths:
+      include: [".env", ".env.*", "*.env", "*.py", "*.ini", "*.cfg", "*.php"]
+      exclude: [".env.example", ".env.sample", ".env.local", ".env.development", ".env.test", ".env.testing"]
+    pattern-regex: (?im)^\s*['"]?(SESSION_COOKIE_SECURE|SESSION_SECURE_COOKIE|CSRF_COOKIE_SECURE)['"]?\s*(=|=>)\s*["']?(false|0|off|no)["']?\s*,?\s*$

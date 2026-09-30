@@ -1,0 +1,142 @@
+# AI Code Auditor — Go rules (own ruleset).
+rules:
+  - id: aca-go-sqli-string-built-query
+    languages: [go]
+    severity: ERROR
+    message: SQL is built with fmt.Sprintf or concatenation. Values from users lead to SQL injection.
+    metadata:
+      title: SQL query built from strings
+      category: Injection
+      aca_severity: high
+      aca_confidence: medium
+      cwe: CWE-89
+      owasp: A03:2021
+      recommendation: Use placeholders (db.Query("... WHERE id = $1", id)).
+    patterns:
+      - pattern-either:
+          - pattern: $DB.$Q(fmt.Sprintf(...), ...)
+          - pattern: $DB.$Q("..." + $X, ...)
+          - patterns:
+              - pattern-either:
+                  - pattern-inside: |
+                      $S := fmt.Sprintf(...)
+                      ...
+                  - pattern-inside: |
+                      $S := "..." + $X
+                      ...
+              - pattern: $DB.$Q($S, ...)
+      - metavariable-regex:
+          metavariable: $Q
+          regex: ^(Query|QueryRow|QueryContext|QueryRowContext|Exec|ExecContext|Raw|Prepare|PrepareContext)$
+
+  - id: aca-go-command-injection
+    languages: [go]
+    severity: ERROR
+    message: A command is run through a shell with a non-constant string; attackers can inject commands.
+    metadata:
+      title: Command injection risk
+      category: Injection
+      aca_severity: high
+      aca_confidence: medium
+      cwe: CWE-78
+      owasp: A03:2021
+      recommendation: Call exec.Command with a fixed program and separate arguments; never pass user data to "sh -c".
+    patterns:
+      - pattern-either:
+          - pattern: exec.Command("sh", "-c", $CMD)
+          - pattern: exec.Command("bash", "-c", $CMD)
+          - pattern: exec.CommandContext($CTX, "sh", "-c", $CMD)
+          - pattern: exec.CommandContext($CTX, "bash", "-c", $CMD)
+      - pattern-not: exec.Command("sh", "-c", "...")
+      - pattern-not: exec.Command("bash", "-c", "...")
+
+  - id: aca-go-tls-insecure-skip-verify
+    languages: [go]
+    severity: WARNING
+    message: InsecureSkipVerify disables TLS certificate verification.
+    metadata:
+      title: TLS certificate verification disabled
+      category: Cryptography
+      aca_severity: medium
+      aca_confidence: high
+      cwe: CWE-295
+      owasp: A07:2021
+      recommendation: Remove InsecureSkipVerify; add private CAs to tls.Config.RootCAs.
+    pattern: |
+      tls.Config{..., InsecureSkipVerify: true, ...}
+
+  - id: aca-go-weak-hash
+    languages: [go]
+    severity: WARNING
+    message: MD5/SHA-1 are broken for security purposes.
+    metadata:
+      title: Weak hash algorithm
+      category: Cryptography
+      aca_severity: medium
+      aca_confidence: low
+      cwe: CWE-327
+      owasp: A02:2021
+      recommendation: Use crypto/sha256 for integrity and golang.org/x/crypto/bcrypt or argon2 for passwords.
+    pattern-either:
+      - pattern: md5.New()
+      - pattern: md5.Sum(...)
+      - pattern: sha1.New()
+      - pattern: sha1.Sum(...)
+
+  - id: aca-go-path-traversal
+    languages: [go]
+    mode: taint
+    severity: ERROR
+    message: A file path comes from request data, allowing "../" access outside the intended folder.
+    metadata:
+      title: Path traversal
+      category: File Security
+      aca_severity: high
+      aca_confidence: medium
+      cwe: CWE-22
+      owasp: A01:2021
+      recommendation: Clean the path with filepath.Clean on a rooted path and verify it stays under the base directory (or use os.Root).
+    pattern-sources:
+      - pattern-either:
+          - pattern: $R.URL.Query().Get(...)
+          - pattern: $R.FormValue(...)
+          - pattern: $R.PostFormValue(...)
+          - pattern: $C.Param(...)
+    pattern-sanitizers:
+      - pattern: filepath.Base(...)
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: os.Open($P)
+              - pattern: os.ReadFile($P)
+              - pattern: os.Remove($P)
+              - pattern: http.ServeFile($W, $REQ, $P)
+              - pattern: $C.File($P)
+          - focus-metavariable: $P
+
+  - id: aca-go-ssrf
+    languages: [go]
+    mode: taint
+    severity: ERROR
+    message: An outgoing request uses a URL from request data (server-side request forgery).
+    metadata:
+      title: Server-side request forgery
+      category: SSRF
+      aca_severity: high
+      aca_confidence: medium
+      cwe: CWE-918
+      owasp: A10:2021
+      recommendation: Allowlist destination hosts and block private, loopback and link-local addresses.
+    pattern-sources:
+      - pattern-either:
+          - pattern: $R.URL.Query().Get(...)
+          - pattern: $R.FormValue(...)
+          - pattern: $R.PostFormValue(...)
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: http.Get($URL)
+              - pattern: http.Post($URL, ...)
+              - pattern: http.NewRequest($M, $URL, ...)
+              - pattern: http.NewRequestWithContext($CTX, $M, $URL, ...)
+          - focus-metavariable: $URL

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Repositories · AI Code Auditor</title>
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body class="booting" data-page="app">
+  <header class="topbar">
+    <a class="brand" href="/"><span class="brand-mark">◆</span> <span class="brand-text">AI Code Auditor</span></a>
+    <nav class="nav">
+      <a href="/" >Dashboard</a>
+      <a href="/repositories.html" class="active">Repositories</a>
+      <a href="/settings.html">Settings</a>
+    </nav>
+    <div class="user">
+      <select id="org-switch" class="org-switch" aria-label="Workspace" hidden></select>
+      <span id="user-name" class="muted"></span>
+      <button id="logout-btn" class="btn btn-ghost btn-sm" type="button">Log out</button>
+    </div>
+  </header>
+  <main class="container">
+    <div class="page-head">
+      <h1>Repositories</h1>
+      <button class="btn btn-primary" id="add-toggle" type="button" hidden>Add repository</button>
+    </div>
+
+    <section class="card" id="add-card" hidden>
+      <div class="tabs" role="tablist">
+        <button class="tab active" type="button" role="tab" aria-selected="true" data-tab="github">GitHub</button>
+        <button class="tab" type="button" role="tab" aria-selected="false" data-tab="zip">ZIP upload</button>
+      </div>
+
+      <form id="github-form" class="form-grid" data-panel="github" novalidate>
+        <label class="span-2">Repository URL <input name="url" placeholder="https://github.com/owner/repo" required></label>
+        <label>Branch <input name="default_branch" placeholder="Default branch"></label>
+        <label>Display name <input name="name" placeholder="Optional"></label>
+        <label class="span-2">Access token <input name="access_token" type="password" autocomplete="off" placeholder="Only for private repositories">
+          <span class="hint">A GitHub fine-grained token with read-only Contents access. Stored encrypted; never shown again.</span></label>
+        <div class="span-2"><button class="btn btn-primary" type="submit">Add repository</button></div>
+      </form>
+
+      <form id="zip-form" class="form-grid" data-panel="zip" hidden novalidate>
+        <label class="span-2">ZIP archive <input name="file" type="file" accept=".zip,application/zip" required>
+          <span class="hint">Up to 100 MB. Archives with symlinks, absolute paths or “..” entries are rejected.</span></label>
+        <label class="span-2">Display name <input name="name" placeholder="Defaults to the file name"></label>
+        <div class="span-2"><button class="btn btn-primary" type="submit">Upload</button></div>
+      </form>
+
+      <p class="form-error" id="form-error" hidden></p>
+    </section>
+
+    <section class="card">
+      <div id="repo-list"></div>
+      <div class="pager" id="pager"></div>
+    </section>
+  </main>
+  <script src="/js/api.js"></script>
+  <script src="/js/repositories.js"></script>
+</body>
+</html>
